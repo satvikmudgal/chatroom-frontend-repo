@@ -16,6 +16,14 @@ function ChatInterface() {
     useEffect(() => {
         fetchAllUsers();
         fetchCurrentUser();
+
+        socket.on("receiveMessage", (message) => {
+            setMessages((prevMessages) => [...prevMessages, message]);
+        });
+
+        return () => {
+            socket.off("receiveMessage");
+        }
     }, []);
 
     const fetchAllUsers = async () => {
