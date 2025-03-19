@@ -9,12 +9,14 @@ function ChatInterface() {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [allUsers, setAllUsers] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
 
     const socket = io("http://localhost:5173"); 
 
     useEffect(() => {
         fetchAllUsers();
-    },);
+        fetchCurrentUser();
+    }, []);
 
     const fetchAllUsers = async () => {
         try {
@@ -25,6 +27,15 @@ function ChatInterface() {
 
         catch (error) {
             console.error("Error fetching all users:", error);
+        }
+    };
+
+    const fetchCurrentUser = async () => {
+        try {
+            const response = await apiClient.get("/api/auth/userinfo");
+            setCurrentUser(response.data);
+        } catch (error) {
+            console.error("Error fetching current user:", error);
         }
     };
 
@@ -58,9 +69,9 @@ function ChatInterface() {
 
     const handleSendMessages = (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedUser) return;
+        if (!newMessage.trim() || !selectedUser || !currentUser) return;
 
-        const senderId = "currentUserId";
+        const senderId = currentUser.id;
 
         socket.emit("sendMessage", {
             senderId,
@@ -84,9 +95,17 @@ function ChatInterface() {
             </form>
 
             <div>
+                {allUsers.map((user) => (
+                    <div key={user.id} onClick={() => handleUserSelect(user)}>
+                        {user.email}
+                    </div>
+                ))}
+            </div>
+
+            <div>
                 {searchResults.map((user) => (
                     <div key={user.id} onClick={() => handleUserSelect(user)}>
-                        {user.firstName} {user.lastName}
+                        {user.email} 
                     </div>
                 ))}
             </div>
@@ -94,6 +113,14 @@ function ChatInterface() {
             {selectedUser && (
                 <div>
                     <h2>Chat with {selectedUser.firstName} {selectedUser.lastName}</h2>
+                    <div>
+                        {/* Display messages */}
+                        {messages.map((message, index) => (
+                            <div key={index}>
+                                <p>{message.content}</p>
+                            </div>
+                        ))}
+                    </div>
                     <form onSubmit={handleSendMessages}>
                         <input
                             type="text"
