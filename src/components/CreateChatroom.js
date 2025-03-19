@@ -8,8 +8,25 @@ function ChatInterface() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
+    const [allUsers, setAllUsers] = useState([]);
 
     const socket = io("http://localhost:5173"); 
+
+    useEffect(() => {
+        fetchAllUsers();
+    },);
+
+    const fetchAllUsers = async () => {
+        try {
+            const response = await apiClient.get("/api/contacts/all-contacts");
+            console.log("All users response:", response.data);
+            setAllUsers(response.data.contacts);
+        }
+
+        catch (error) {
+            console.error("Error fetching all users:", error);
+        }
+    };
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -18,7 +35,7 @@ function ChatInterface() {
             return;
         }
         try {
-            const response = await apiClient.post("/api/chat/search", { searchTerm });
+            const response = await apiClient.post("/api/contacts/search", { searchTerm });
             setSearchResults(response.data.contacts);
         } catch (error) {
             console.error("Error searching for users:", error);
