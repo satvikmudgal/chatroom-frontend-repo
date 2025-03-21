@@ -1,3 +1,7 @@
+// Author: Satvik Mudgal
+// Description: Main application file for the chat application.
+// Class: CS 314 - Elementary Software Engineering
+
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import NavigationBar from "./components/NavigationBar";
