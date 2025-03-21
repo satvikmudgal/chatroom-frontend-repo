@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import apiClient from "../utils/apiClient";
 
 function ChatList() {
-    const [chatrooms, setChatrooms] = useState([]);
+    const [contacts, setContacts] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
 
     useEffect(() => {
@@ -18,8 +18,8 @@ function ChatList() {
 
       const fetchChatrooms = async () => {
           try {
-              const response = await apiClient.get("/api/contacts/all-contacts");
-              setChatrooms(response.data.contacts); // Assume this returns all user contacts
+              const response = await apiClient.get("/api/contacts/get-contacts-for-list");
+              setContacts(response.data.contacts); // Assume this returns all user contacts
           } catch (error) {
               console.error("Error fetching chatrooms:", error);
           }
@@ -32,16 +32,16 @@ function ChatList() {
 
     return (
         <div>
-          <h2>Available Chatrooms</h2>
+          <h2>Recent Chats</h2>
           <ul>
-            {chatrooms.length > 0 ? (
-              chatrooms.map((room) => (
-                <li key={room.id}>
-                  <Link to={`/chatroom/${room.id}`}>{room.name}</Link>
+            {contacts.length > 0 ? (
+              contacts.map((contact) => (
+                <li key={contact.id}>
+                  <Link to={`/chatroom/${contact.id}`}>{contact.email}</Link>
                 </li>
               ))
             ) : (
-              <p>No chatrooms available.</p>
+              <p>No recent chats.</p>
             )}
           </ul>
         </div>

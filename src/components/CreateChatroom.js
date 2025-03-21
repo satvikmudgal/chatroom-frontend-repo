@@ -1,147 +1,161 @@
-import React, { useState, useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import apiClient from "../utils/apiClient";
-import { io } from "socket.io-client";
+import socket from "../utils/socket";
 
-function ChatInterface() {
+function CreateChatroom() {
+    const [contacts, setContacts] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
-    const [searchResults, setSearchResults] = useState([]);
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState("");
-    const [allUsers, setAllUsers] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [selectedContact, setSelectedContact] = useState(null);
+    const [messages, setMessages] = useState("");
+    const [chatMessages, setChatMessages] = useState([]);
+    const [showingAllContacts, setShowingAllContacts] = useState(false); 
 
-    const socket = io("http://localhost:5173"); 
+    // Fetch all contacts
+    const fetchAllContacts = async () => {
+        setLoading(true);
+        try {
+            const response = await apiClient.get("/api/contacts/all-contacts");
+            setContacts(response.data.contacts);
+            setLoading(false);
+        } catch (error) {
+            console.error("Error fetching all users:", error);
+            setError("Error fetching contacts. Please try again.");
+            setLoading(false);
+        }
+    };
+
+    // Search contacts by searchTerm
+    const searchContacts = async () => {
+        if (!searchTerm) {
+            setError("Search term is required.");
+            return;
+        }
+        setLoading(true);
+        try {
+            const response = await apiClient.post("/api/contacts/search", { searchTerm });
+            setContacts(response.data.contacts);
+            setLoading(false);
+        } catch (error) {
+            console.error("Error searching for users:", error);
+            setError("Error searching for users. Please try again.");
+            setLoading(false);
+        }
+    };
+
+    const handleSelectContact = async (contact) => {
+        setSelectedContact(contact);
+
+        try {
+            const response = await apiClient.post("/api/messages/get-messages", { id: contact.id });
+            setChatMessages(response.data.messages);
+        } catch (error) {
+            console.error("Error loading messages:", error);
+            setError("Error loading messages. Please try again.");
+        }
+    };
+
+    const handleSendMessage = () => {
+        if (!messages.trim()) return;
+
+        socket.emit("sendMessage", {
+            sender: "currentUserId",
+            recipient: selectedContact.id,
+            content: messages,
+            messageType: "text",
+        });
+
+        const newMessage = {
+            sender: { id: "currentUserId", firstName: "Your Name" },
+            recipient: selectedContact,
+            content: messages,
+            messageType: "text",
+        };
+        setChatMessages((prevMessages) => [...prevMessages, newMessage]);
+        setMessages("");
+    };
 
     useEffect(() => {
-        fetchAllUsers();
-        fetchCurrentUser();
-
-        socket.on("receiveMessage", (message) => {
-            setMessages((prevMessages) => [...prevMessages, message]);
+        socket.on("receiveMessage", (messages) => {
+            if (messages.recipient.id === selectedContact.id || messages.sender.id === selectedContact.id) {
+                setChatMessages((prevMessages) => [...prevMessages, messages]);
+            }
         });
 
         return () => {
             socket.off("receiveMessage");
-        }
-    }, []);
-
-    const fetchAllUsers = async () => {
-        try {
-            const response = await apiClient.get("/api/contacts/all-contacts");
-            console.log("All users response:", response.data);
-            setAllUsers(response.data.contacts);
-        }
-
-        catch (error) {
-            console.error("Error fetching all users:", error);
-        }
-    };
-
-    const fetchCurrentUser = async () => {
-        try {
-            const response = await apiClient.get("/api/auth/userinfo");
-            setCurrentUser(response.data);
-        } catch (error) {
-            console.error("Error fetching current user:", error);
-        }
-    };
-
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!searchTerm) {
-            setSearchResults();
-            return;
-        }
-        try {
-            const response = await apiClient.post("/api/contacts/search", { searchTerm });
-            setSearchResults(response.data.contacts);
-        } catch (error) {
-            console.error("Error searching for users:", error);
-        }
-    };
-
-    const handleUserSelect = (user) => {
-        setSelectedUser(user);
-        fetchMessages(user.id);
-    };
-
-    const fetchMessages = async (contactorId) => {
-        try {
-            const response = await apiClient.prototype("/api/messages/get-messages", { contactorId });
-            setMessages(response.data.messages);
-        } catch (error) {
-            console.error("Error fetching messages:", error);
-        }
-    };
-
-    const handleSendMessages = (e) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !selectedUser || !currentUser) return;
-
-        const senderId = currentUser.id;
-
-        socket.emit("sendMessage", {
-            senderId,
-            recipientId: selectedUser.id,
-            content: newMessage,
-            messageType: "text",
-        });
-        setNewMessage("");
-    };
+        };
+    }, [selectedContact]);
 
     return (
         <div>
-            <form onSubmit={handleSearch}>
+            <h2>Create Chatroom</h2>
+
+            <div>
                 <input
                     type="text"
-                    placeholder="Search for users..."
+                    placeholder="Search contacts..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <button type="submit">Search</button>
-            </form>
-
-            <div>
-                {allUsers.map((user) => (
-                    <div key={user.id} onClick={() => handleUserSelect(user)}>
-                        {user.email}
-                    </div>
-                ))}
+                <button onClick={() => { searchContacts(); setShowingAllContacts(false); }}>Search Contacts</button>
+                <button onClick={() => { fetchAllContacts(); setShowingAllContacts(true); }}>Show All Contacts</button>
             </div>
 
+            {error && <p style={{ color: "red" }}>{error}</p>}
+            {loading && <p>Loading contacts...</p>}
+
             <div>
-                {searchResults.map((user) => (
-                    <div key={user.id} onClick={() => handleUserSelect(user)}>
-                        {user.email} 
-                    </div>
-                ))}
+                {showingAllContacts ? (
+                    contacts.length === 0 ? (
+                        <p>No contacts found.</p>
+                    ) : (
+                        contacts.map((contact) => (
+                            <div key={contact.value} style={{ marginBottom: "15px", padding: "10px", border: "1px solid #ccc", borderRadius: "5px" }}>
+                                <p><strong>{contact.label || "No name available"}</strong></p>
+                                <button onClick={() => handleSelectContact(contact)}>Send Message</button>
+                            </div>
+                        ))
+                    )
+                ) : (
+                    contacts.length === 0 ? (
+                        <p>No search results found.</p>
+                    ) : (
+                        contacts.map((contact) => (
+                            <div key={contact.value} style={{ marginBottom: "15px", padding: "10px", border: "1px solid #ccc", borderRadius: "5px" }}>
+                                <p><strong>{contact.email}: {contact.label || "No name available"}</strong></p>
+                                <button onClick={() => handleSelectContact(contact)}>Send Message</button>
+                            </div>
+                        ))
+                    )
+                )}
             </div>
 
-            {selectedUser && (
+            {selectedContact && (
                 <div>
-                    <h2>Chat with {selectedUser.firstName} {selectedUser.lastName}</h2>
+                    <h3>Chat with - {selectedContact.email}: {selectedContact.label} </h3>
                     <div>
-                        {/* Display messages */}
-                        {messages.map((message, index) => (
-                            <div key={index}>
-                                <p>{message.content}</p>
+                        {chatMessages.map((msg, index) => (
+                            <div key={index} style={{ marginBottom: "10px" }}>
+                                <strong>{msg.sender.firstName}:</strong>
+                                <p>{msg.content}</p>
                             </div>
                         ))}
                     </div>
-                    <form onSubmit={handleSendMessages}>
+                    <div>
                         <input
                             type="text"
+                            value={messages}
+                            onChange={(e) => setMessages(e.target.value)}
                             placeholder="Type your message..."
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
                         />
-                        <button type="submit">Send</button>
-                    </form>
+                        <button onClick={handleSendMessage}>Send</button>
+                    </div>
                 </div>
             )}
         </div>
     );
 }
 
-export default ChatInterface;
+export default CreateChatroom;
